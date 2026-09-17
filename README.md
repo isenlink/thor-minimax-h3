@@ -19,6 +19,7 @@
 | 权重总量 | **43 017 MB** = 文本编码器 17 376 + DiT 20 083 + VAE 5 558（全在池内） |
 | 864×480×56 帧（2.33 s 片，8 步） | **314 s**（≈5.2 分钟） |
 | 864×480×124 帧（5.17 s 片，8 步） | **953 s**（≈15.9 分钟） |
+| **1344×768×124 帧**（模型原生档，需 `te=disk`） | **4228 s**（≈70 min）—— 见 [§04](docs/04-resolution-vram/resolution-vram-measured.md) |
 | 峰值池占用 | **42.8 / 46 GiB** —— 必须独占池 |
 | 有效算力（反推） | int8 GEMM ≈ **7.6 TFLOPS**（同平台 bf16 峰值 ≈60） |
 | 温度 | 全程 48–54 °C（被动散热，无压力） |
@@ -31,8 +32,10 @@
 | 文档 | 内容 |
 |---|---|
 | [docs/02-h3-video-audio/h3-video-audio.md](docs/02-h3-video-audio/h3-video-audio.md) | 主文档：内存预算、权重选型与两个格式陷阱、池门禁脚本、实测性能、踩坑清单、复现清单 |
+| [docs/04-resolution-vram/resolution-vram-measured.md](docs/04-resolution-vram/resolution-vram-measured.md) | 分辨率上限与显存腾挪实测：`te=disk` 腾出 15.88 GiB、三档分辨率 × 耗时 × 显存、1344×768 跑通、提示词配方、交付前自检 |
 | [docs/03-troubleshooting/troubleshooting.md](docs/03-troubleshooting/troubleshooting.md) | 按症状索引的踩坑速查表（与主文档 §五 同步） |
 | [scripts/sd-pool-gate.sh](scripts/sd-pool-gate.sh) | 池门禁入口脚本：检测 GPU 占用 → 自动让池 → 跑完自动恢复 |
+| [samples/](samples/README.md) | 三档分辨率实测成片（864×480 / 1024×576 / 1344×768，带音轨）+ 帧抽检图 |
 
 ## 核心要点（三分钟版）
 
