@@ -1,11 +1,12 @@
 # 在 DRIVE Thor 上跑 MiniMax-H3（视频 + 音频双轨生成）
 
 > One-liner: Running MiniMax-H3 (joint video+audio generation) on an NVIDIA DRIVE Thor
-> board — how a **43 GB** weight set fits into a **46 GiB** unified-memory pool, why the
+> board — how a **45 GB** weight set (**42.0 GiB** once loaded) fits into a **46 GiB** pool, why the
 > pool must be **exclusively** owned, the model-format traps that cost us a wasted
 > download, and full measured performance (56/124-frame clips) on real hardware.
 >
 > 适用：DRIVE Thor（p3960-0010 / Tegra264 / sm_101a），DriveOS 7.0.3，CUDA 12.8
+> 本仓库版：脱敏整理
 
 ---
 
@@ -20,11 +21,21 @@
 | 峰值池占用 | **42.8 / 46 GiB** —— 所以 **必须独占池**（跑前停掉同机常驻 LLM 服务） |
 | 有效算力（反推） | int8 GEMM ≈ **7.6 TFLOPS** |
 | 温度 | 全程 48–54 °C（被动散热，无压力） |
-| 音轨 | 与视频**同步产出**（同一 DiT + 独立音频 VAE），无需二次配音 |
+| 音轨 | **模型联合生成**（与画面同一个 DiT + 独立音频 VAE）——输出文件**自带音轨**，不是后期配音。实测产物为 `h264 + aac 32 kHz 立体声`（`sd-cli` 直出的 avi 为 `mjpeg + pcm_s16le`） |
 
 **一句话**：能跑，但它是"**独占池 + 分钟级**"的负载——适合后台批量出片，不适合交互式秒回。
 
+> **🚀 最快路径（不想自己交叉编译）**
+> 本仓库提供**预编译好的 aarch64 二进制**（`sd-cli` / `sd-server`，sm_101，含 sha256），
+> 下载 → 校验 → 上板即可，跳过本文的编译环节。
+> 步骤见 **[prebuilt-binary-quickstart.md](../05-prebuilt-binary/prebuilt-binary-quickstart.md)**。
+
 ---
+
+> **单位口径（本文档统一）**
+> - **GiB** 用于池／显存口径（本平台大页池 46 GiB 级；`sd.cpp` 打印的 "MB" 实际是 **MiB**）
+> - **GB** 用于磁盘文件口径（1 GB = 10⁹ B）
+> - 例：H3 权重磁盘占 **45.0 GB**（= 41.9 GiB），运行时占 VRAM **42.0 GiB**（框架报 `43 017 MB`）
 
 ## 一、内存预算：H3 为什么必须独占池
 
@@ -57,7 +68,7 @@ sudo cat /sys/kernel/debug/nvmap/iovmm/clients                 # 谁在占 GPU �
 | 占用者 | 池内占用 | 备注 |
 |---|---|---|
 | 同机常驻 LLM 服务（单槽、长上下文） | ≈ 36.7 GiB | 权重 + KV cache + 缓冲 |
-| **MiniMax-H3（本配置）** | **≈ 43.0 GiB** | 46 GiB 池装不下"两者之和" |
+| **MiniMax-H3（本配置）** | **42.0 GiB**（VRAM 口径） | 46 GiB 池装不下"两者之和" |
 | 池总量 | 46 GiB | — |
 
 ⇒ **H3 与常驻 LLM 服务无法共存**：必须先把 LLM 服务停掉，把池整块让出来。
@@ -70,7 +81,7 @@ sudo cat /sys/kernel/debug/nvmap/iovmm/clients                 # 谁在占 GPU �
 | 跑完 `systemctl start <llm-service>` → 服务 READY、nvmap 回到 36.7 GB | **20 秒内** |
 
 注：即使池全空，单进程能拿到的上限也是 **≈44-45 GiB**（实测 44 GiB 分配 + 实写 ✅、46 GiB ❌），
-H3 的 43.0 GB 基本是**贴着上限**在跑——所以留给"池外普通内存"的余量要盯紧（`MemAvailable`），
+H3 权重运行时占 **42.0 GiB**，相对 46 GiB 的池**基本是贴着上限**在跑——所以留给"池外普通内存"的余量要盯紧（`MemAvailable`），
 别让系统侧（SSH/监控/日志）没内存。
 
 ---
@@ -86,7 +97,7 @@ H3 在 `stable-diffusion.cpp` 里需要 **4 个文件**（DiT + 文本编码器 
 | 文本编码器 `qwen3vl_32b_minimax_h3-Q4_K_M.gguf` | **16.97 GiB** | Q4_K_M 档（本机 ComfyUI 件，**实测与官方同构，直接复用**） |
 | 视频 VAE `minimax_h3_video_vae_fp16.safetensors` | 4.85 GiB | — |
 | 音频 VAE `minimax_h3_audio_vae_fp32.safetensors` | 0.56 GiB | — |
-| **合计** | **≈ 43.0 GiB** | 与运行时实报 43 017 MB 吻合 |
+| **合计** | **42.0 GiB**（磁盘 41.9 GiB = 45.0 GB） | 与运行时实报 `43 017 MB`（MiB）吻合 |
 
 **更省内存的替代档**（需要时再下，本次未用）：官方 GGUF 量化版 DiT 走 Q4_K_M 约 **10.64 GiB**
 ⇒ 可把总量压到 ≈ 33 GiB，为 124 帧档多留 ~9 GiB 余量。**快慢/画质需自行 A/B**，不要凭直觉认为
@@ -112,7 +123,7 @@ Comfy-Org 为自家 loader 打了兼容标（`wan`），而 **`sd.cpp` 源码里
 与官方同名文件逐项比对，**完全同构**：
 
 ```
-902 个张量 = model 551 + visual 351（含 24 个 DeepStack merger，层 0–49）
+902 个张量 = model 551 + visual 351（含 **3 组** DeepStack merger：`visual.deepstack_merger_list.{0,1,2}`，层 0–49）
 ```
 
 ⇒ 省掉一次 **12–17 GiB** 的下载与传输。
@@ -120,11 +131,14 @@ Comfy-Org 为自家 loader 打了兼容标（`wan`），而 **`sd.cpp` 源码里
 **♻️ 可复用手法（强烈推荐）：远程比对 GGUF 头部，比下载快 100 倍**
 
 不要为了确认"两个文件是不是同一个"去下全量。GGUF 的张量清单就在文件头部，
-用 HTTP Range 拉前几百 KB 就能解析出全部 kv 与张量名：
+用 HTTP Range 拉几 MB 就能解析出全部 kv 与张量名。
+
+> ⚠️ **拉取量别太小**：头部含 tokenizer 等大字段——实测 Z-Image 的文本编码器头部到 **5.93 MB**
+> （H3 的文本编码器只有 24 B）。按 400 KB 拉会解析失败；示例统一拉 **6 MB**。
 
 ```bash
 # 只拉头部（示例走镜像站；换成你的实际 URL）
-curl -sL -r 0-400000 "https://<hf-mirror>/<repo>/resolve/main/<file>.gguf" -o head.bin
+curl -sL -r 0-6000000 "https://<hf-mirror>/<repo>/resolve/main/<file>.gguf" -o head.bin
 ```
 
 ```python
@@ -146,7 +160,8 @@ def rv(t):                       # GGUF 值类型
     if t == 8:  return rs()
     if t == 9:  # 数组
         et = s.unpack("<I", f.read(4))[0]; n = s.unpack("<Q", f.read(8))[0]
-        return [rv(et) for _ in range(min(n, 4))]     # 头部只取前几项够用
+        vals = [rv(et) for _ in range(n)]            # 必须读完整，少读会让后续字段错位
+        return vals if n <= 4 else vals[:4]          # 只展示前几项
     fmt, sz = m[t]; return s.unpack(fmt, f.read(sz))[0]
 
 kvs = {rs(): rv(struct.unpack("<I", f.read(4))[0]) for _ in range(n_kv)}
@@ -158,17 +173,31 @@ for _ in range(n_tensors):
 print("arch =", kvs.get("general.architecture"))
 ```
 
-**这一步同时解决了两个陷阱**：① 一眼看出 `general.architecture` 是不是 `wan`（能不能用）；
+**这一步同时解决了两个陷阱**：① 一眼看出 `general.architecture` 是不是被第三方改过
+（注意**别误判合法值**：不同模型系列 arch 本来就不同，例如 Z-Image 的 DiT 正常就是 `lumina2`）；
 ② 逐项比对张量清单，判断"疑似缺件"是否真的同构（能省十几 GB 传输）。
 
 ---
 
 ## 三、怎么跑：池门禁脚本（**推荐入口**）
 
-手动停服务容易忘恢复。用一段门禁脚本包起来——**检测到 GPU 被占 → 自动让池 → 跑完自动恢复**。
-完整脚本见仓库 [`scripts/sd-pool-gate.sh`](../../scripts/sd-pool-gate.sh)，核心逻辑：
+手动停服务容易忘恢复。用一段门禁脚本包起来——**检测到 GPU 被占 → 自动让池 → 跑完自动恢复**：
 
 ```bash
+#!/bin/bash
+# sd-pool-gate.sh — 扩散模型统一入口（Z-Image 可与 LLM 服务共存；H3 必须独占池）
+# 用法: sd-pool-gate.sh h3 <DiT> <TE> <W> <H> <帧数> <步数> <输出名> [prompt]
+#       sd-pool-gate.sh zimage -W 1024 -H 1024 --steps 8 -p "..." -o out/x.png
+#       sd-pool-gate.sh status
+set -u
+SD=${SD_DIR:-/brand_data/sd-cpp}; cd "$SD" || exit 1
+M=models; LLM_UNIT=${LLM_UNIT:-llama-server}
+DIT=$M/minimax_h3_fl2va_pruned_int8_convrot.safetensors
+TE=$M/qwen3vl_32b_minimax_h3-Q4_K_M.gguf
+VAE=$M/minimax_h3_video_vae_fp16.safetensors
+AVAE=$M/minimax_h3_audio_vae_fp32.safetensors
+HP=/sys/kernel/mm/hugepages/hugepages-2048kB
+
 pool_state() {
   echo "池: Total=$(cat $HP/nr_hugepages) Free=$(cat $HP/free_hugepages)" \
        "| GPU 占用: $(sudo -n cat /sys/kernel/debug/nvmap/iovmm/clients 2>/dev/null \
@@ -177,6 +206,14 @@ pool_state() {
 }
 gpu_busy() { pgrep -f "bin/(sd-cli|sd-server) " >/dev/null || pgrep -f "$LLM_UNIT" >/dev/null; }
 
+start_llm() {
+  sudo -n systemctl start "$LLM_UNIT"
+  for i in $(seq 1 12); do
+    systemctl is-active --quiet "$LLM_UNIT" && { echo "  LLM 服务已恢复($((i*2))s)"; return 0; }
+    sleep 2
+  done
+  echo "  !!! LLM 服务恢复超时"
+}
 stop_llm() {
   sudo -n systemctl stop "$LLM_UNIT"
   for i in $(seq 1 15); do           # 等 nvmap 占用归零 = 池真正释放
@@ -187,27 +224,47 @@ stop_llm() {
   done
   echo "  !!! 池释放等待超时（继续，风险自负）"
 }
-```
 
-H3 运行命令本体：
-
-```bash
-./bin/sd-cli -M vid_gen --diffusion-model "$DIT" --vae $VAE --audio-vae $AVAE --llm "$TE" \
-  -p "${PROMPT:-a cat surfing on a tropical ocean wave, cinematic}" \
-  --cfg-scale 1.0 -W "$W" -H "$H" --video-frames "$FR" --steps "$ST" \
-  --diffusion-fa --fps 24 -o "out/$OUT"
+case "${1:-status}" in
+  status) pool_state; gpu_busy && echo "GPU: 有进程在跑" || echo "GPU: 空闲"; exit 0 ;;
+  zimage)
+    shift; pool_state
+    [ "$(free -m | awk '/Mem:/{print $7}')" -lt 9000 ] && echo "警告: 池外可用内存偏低"
+    T0=$SECONDS
+    ./bin/sd-cli --diffusion-model $M/z_image_turbo-Q4_K_S.gguf --vae $M/ae.safetensors \
+      --llm $M/Qwen3-4B-Q4_K_M.gguf --cfg-scale 1.0 --steps 8 "$@"
+    echo "rc=$? wall=$((SECONDS-T0))s"; exit 0 ;;
+  h3)
+    shift
+    DIT=${1:-$DIT}; TE=${2:-$TE}; W=${3:-864}; H=${4:-480}
+    FR=${5:-56}; ST=${6:-8}; OUT=${7:-h3_out}
+    shift 7 || true
+    echo "=== H3 $(basename "$DIT") + $(basename "$TE") ${W}x${H} ${FR}f ${ST}step ==="
+    pool_state
+    RESTORE=0
+    if gpu_busy; then echo "检测到 GPU 占用 → 停 LLM 服务让出池（跑完自动恢复）"; RESTORE=1; stop_llm; fi
+    T0=$SECONDS
+    ./bin/sd-cli -M vid_gen --diffusion-model "$DIT" --vae $VAE --audio-vae $AVAE --llm "$TE" \
+      -p "${PROMPT:-a cat surfing on a tropical ocean wave, cinematic}" \
+      --cfg-scale 1.0 -W "$W" -H "$H" --video-frames "$FR" --steps "$ST" \
+      --diffusion-fa --fps 24 -o "out/$OUT" "$@"
+    RC=$?; echo "rc=$RC wall=$((SECONDS-T0))s"; pool_state
+    [ "$RESTORE" = 1 ] && { echo "恢复生产服务"; start_llm; pool_state; }
+    exit $RC ;;
+  *) echo "用法: sd-pool-gate.sh {zimage|h3|status} ..."; exit 1 ;;
+esac
 ```
 
 要点：
 
 - **等 `nvmap` 占用归零**再开跑——`systemctl stop` 返回 ≠ 显存已释放（实测 20 秒内释放完）；
-- **跑完自动 `start`**，不让生产服务躺在地上；
+- **跑完自动 `start`**，不让生产服务躺在地上（脚本里 `RESTORE` 分支）；
 - H3 是长任务（最长一档 16 分钟），**务必脱离 SSH**（`setsid nohup ... < /dev/null &`），
   否则断线会被 SIGHUP 连带杀掉。
 
 ---
 
-## 四、实测性能（2026-09，864×480，8 步，`--cfg-scale 1.0 --diffusion-fa`）
+## 四、实测性能（2026-09-16，864×480，8 步，`--cfg-scale 1.0 --diffusion-fa`）
 
 | 档位 | 总耗时 | 文本条件 | 采样 | s/step | 视频 VAE | 音频 VAE | 峰值池占用 |
 |---|---|---|---|---|---|---|---|
@@ -224,14 +281,27 @@ H3 运行命令本体：
 - **音轨**：视频与音频在同一流程内产出（独立 audio VAE），无需二次配音
 - **温度**：48–54 °C，远低于红线，无散热压力
 
-> **想上更高分辨率（1024×576 / 1344×768）？** 见
-> [§04 分辨率上限与显存腾挪实测](../04-resolution-vram/resolution-vram-measured.md)：
-> 默认配置下权重常驻几乎吃光 46 GiB 池，高分辨率档必然分配失败；
-> 用 `--auto-fit off --params-backend te=disk` 把文本编码器挪到磁盘，**实测腾出 15.88 GiB**，
-> 1344×768（模型原生档）由"必然失败"变为可跑通（4228 s）。三档分辨率 × 耗时 × 显存实测数据都在那篇。
-
 > 横比参考：同一档位在一台 x86 + 高功耗 GPU 的机器上跑 244.6 s（≈2.5 分钟），
-> **Thor 约慢 4 倍**——但它是 60 W 级的车规 SoC，且整机可离线部署。权衡点在这里。
+> **Thor 慢 1.3×（56 帧档）～3.9×（124 帧档）**——但它是 60 W 级的车规 SoC，且整机可离线部署。权衡点在这里。
+
+### 4.1 输出：文件自带音轨（ffprobe 实证）
+
+**必须传 `--audio-vae <音频VAE>`**，否则只有画面没有声音。上游文档原文：
+
+> *Omitting `--audio-vae` still runs the joint diffusion model but produces video without a decoded audio track.*
+
+实测产物（`ffprobe -show_entries stream=codec_type,codec_name,channels,sample_rate,duration` 原样）：
+
+| 产物 | 视频流 | 音频流 |
+|---|---|---|
+| `h3_864x480_56f_2s33.mp4` | h264，**2.333 s** | **aac，32 000 Hz，2 声道，2.325 s** |
+| `h3_864x480_124f_5s17.mp4` | h264，**5.167 s** | **aac，32 000 Hz，2 声道，5.175 s** |
+| `h3_864x480_56f.avi`（`sd-cli` 直出格式） | mjpeg | **pcm_s16le，32 000 Hz，2 声道** |
+
+⇒ **音视频时长对齐**（2.325 vs 2.333 s；5.175 vs 5.167 s），音轨随画面一起由模型生成。
+⇒ 若你拿到的文件没有声音：先确认命令行里带了 `--audio-vae`（常见遗漏），再用
+`ffprobe <文件>` 看是否存在 audio 流。
+
 
 ---
 
@@ -239,6 +309,7 @@ H3 运行命令本体：
 
 | 症状 | 根因 | 处理 |
 |---|---|---|
+| 传 `--video-frames 60` 却得到 73 帧 | 本模型帧数按 **`17k+5` 网格向上对齐**（源码实测） | 要精确控制就用网格值：**5 / 22 / 39 / 56 / 73 / 90 / 107 / 124** |
 | 加载即报 architecture 不符 / 被当 Wan 模型 | ComfyUI 版 DiT GGUF 头部 `general.architecture = wan` | 换官方 GGUF 或 safetensors 版 DiT |
 | 分配失败 `cudaMalloc failed: out of memory`（明明内存"看起来"够） | 池被同机服务占满、或你**把池写成了 0** | 停服务让池；**永远不要 `nr_hugepages=0`** |
 | 传输/下载多花了十几 GB | 没先比对 GGUF 头部就重下 | 用 §2.2 的 Range 头部解析先比对 |
@@ -252,22 +323,16 @@ H3 运行命令本体：
 
 ## 六、复现清单
 
-1. **交叉编译** `stable-diffusion.cpp`（aarch64 + CUDA 12.8 sbsa + `sm_101`）。
+1. **拿到二进制**：用本仓库的预编译包（[prebuilt-binary-quickstart.md](../05-prebuilt-binary/prebuilt-binary-quickstart.md)），
+   或自己交叉编译 `stable-diffusion.cpp`（aarch64 + CUDA 12.8 sbsa + `sm_101`，见 `../02-cross-compile/`）。
 2. **拿权重**：DiT（官方 GGUF 或 int8 safetensors）+ TE（Q4_K_M GGUF）+ 视频/音频 VAE，
    逐个 `sha256` 校验；**动手前先按 §2.2 比对 GGUF 头部**。
-3. **算池**：`nr_hugepages × 2 MiB` 必须 **≥ 45 GiB**（H3 权重 43 GB 贴着上限），
+3. **算池**：`nr_hugepages × 2 MiB` 必须 **≥ 45 GiB**（H3 运行时占 42.0 GiB，贴近 46 GiB 池上限），
    并确认 `MemAvailable` 还有几 GB 余量给系统。
-4. **让池**：停掉同机占 GPU 的服务，等 `nvmap` 占用归零（门禁脚本已包）。
+4. **让池**：停掉同机占 GPU 的服务，等 `nvmap` 占用归零（脚本已包）。
 5. **跑**：`sd-cli -M vid_gen --diffusion-model <DiT> --vae <video-vae> --audio-vae <audio-vae> --llm <TE> -W 864 -H 480 --video-frames 56 --steps 8 --diffusion-fa --fps 24 -o out/clip`
 6. **恢复**：`systemctl start <llm-service>`，确认服务 READY、池占用回到原值。
-
 ---
 
-## 代称说明
-
-- 文中 `/brand_data/` 是路径代称：指板载数据盘上的工作目录（真实目录名含设备品牌字样，为保持
-  品牌中立以代称代替）。在板上 `ls /` 即可看到真实名称；脚本中 `SD=${SD_DIR:-/brand_data/sd-cpp}`
-  可用环境变量 `SD_DIR` 覆盖为任何你自己的路径。
-- `<llm-service>` / `LLM_UNIT`：同机常驻 LLM 服务的 systemd 单元名（我们用 llama.cpp 的
-  `llama-server`），按你的实际部署替换。
-- `<hf-mirror>` / `<repo>`：HuggingFace 镜像站与仓库名占位，按实际下载源替换。
+[整理者注] 本文由真实部署过程整理；内部主机名、账号、凭据与业务标识已按公开分享规范移除或代称化
+（如板端数据分区统一写作 `/brand_data`）。文中的命令与数据均来自实际运行记录。
