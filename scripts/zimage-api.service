@@ -11,7 +11,7 @@ Group=user
 WorkingDirectory=/brand_data/sd-cpp
 Environment=PORT=8081
 Environment=SD_DIR=/brand_data/sd-cpp
-ExecStart=/usr/bin/python3 /brand_data/sd-cpp/zimage_api.py
+ExecStart=/usr/bin/python3 /brand_data/sd-cpp/zimage-api.py
 Restart=always
 RestartSec=3
 StandardOutput=journal
