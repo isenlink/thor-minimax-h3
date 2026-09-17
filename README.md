@@ -33,8 +33,10 @@
 |---|---|
 | [docs/02-h3-video-audio/h3-video-audio.md](docs/02-h3-video-audio/h3-video-audio.md) | 主文档：内存预算、权重选型与两个格式陷阱、池门禁脚本、实测性能、踩坑清单、复现清单 |
 | [docs/04-resolution-vram/resolution-vram-measured.md](docs/04-resolution-vram/resolution-vram-measured.md) | 分辨率上限与显存腾挪实测：`te=disk` 腾出 15.88 GiB、三档分辨率 × 耗时 × 显存、1344×768 跑通、提示词配方、交付前自检 |
+| [docs/05-prebuilt-binary/prebuilt-binary-quickstart.md](docs/05-prebuilt-binary/prebuilt-binary-quickstart.md) | 预编译二进制下载即用：平台判断、下载校验、上板 5 步、模型获取与 GGUF 头部比对、常见错误对照、构建来源 |
 | [docs/03-troubleshooting/troubleshooting.md](docs/03-troubleshooting/troubleshooting.md) | 按症状索引的踩坑速查表（与主文档 §五 同步） |
 | [scripts/sd-pool-gate.sh](scripts/sd-pool-gate.sh) | 池门禁入口脚本：检测 GPU 占用 → 自动让池 → 跑完自动恢复 |
+| [scripts/zimage-api.py](scripts/zimage-api.py) + [zimage-api.service](scripts/zimage-api.service) | 按需 HTTP 出图服务（OpenAI/A1111 兼容、异步 job、产物直链、空闲零显存）+ systemd 单元 |
 | [samples/](samples/README.md) | 三档分辨率实测成片（864×480 / 1024×576 / 1344×768，带音轨）+ 帧抽检图 |
 
 ## 核心要点（三分钟版）
