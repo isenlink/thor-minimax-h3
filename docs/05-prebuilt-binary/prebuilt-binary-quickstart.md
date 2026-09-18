@@ -42,7 +42,11 @@ no kernel image is available for execution on the device
 | `sd-server` | 101,320,080 B（96.6 MiB） | HTTP + 内置 Web UI（常驻方案用；按需方案见 [`scripts/zimage-api.py`](../../scripts/zimage-api.py)） | `f8cd7e0d1f9bfa3b78d144df0a4d1d830ce4be84315f8012a692c3b95863e567` |
 
 > 从本仓库的 **Releases** 页面下载（`Releases → 最新版本 → Assets`）。
-> 注：若该 Release 尚未建立，本文档配套的二进制同时放在仓库共享目录里（见仓库说明）。
+>
+> **网盘镜像**（GitHub 下载慢/不通时备用）——`sd-cpp-thor-sm101-20260917.tar.gz`（111 MB，内容 = 上面两个二进制 + SHA256SUMS 打包）：
+>
+> - 百度网盘：<https://pan.baidu.com/s/1-FiOwmedrh6bMgVGnM14mA?pwd=vxrw>（提取码 `vxrw`）
+> - 解包后对包内 `SHA256SUMS` 执行 `sha256sum -c`，或直接用下方校验命令核对单个二进制。
 
 **使用前务必校验**（下载损坏是"上板后各种奇怪报错"的常见来源）：
 
