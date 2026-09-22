@@ -37,6 +37,9 @@
 
 > 两条线共用同一个二进制（`sd-cli`，见 [Releases](https://github.com/isenlink/thor-minimax-h3/releases)）。
 > 先读 [05 预编译二进制](docs/05-prebuilt-binary/prebuilt-binary-quickstart.md) 下载上板，再按你要的线走对应 quickstart。
+>
+> **⚡ GitHub 下载慢/不通时，走百度网盘镜像**（`sd-cpp-thor-sm101-20260917.tar.gz`，111 MB，内容 = sd-cli + sd-server + SHA256SUMS）：
+> 🔗 **<https://pan.baidu.com/s/1-FiOwmedrh6bMgVGnM14mA?pwd=vxrw>** （提取码 `vxrw`，解包后 `sha256sum -c SHA256SUMS` 核验）
 
 | 文档 | 内容 |
 |---|---|
