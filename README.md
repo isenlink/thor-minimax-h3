@@ -19,7 +19,7 @@
 
 > 🚀 **CUDA 13 前向兼容线（2026-10-22）** — MiniMax-H3 的 ComfyUI cu130 路线，8 步生产 LoRA
 > 同口径 **289.4 s/段 vs sd.cpp 1049 s/段 = 3.63×**。无自编译件（纯官方 wheel + NVIDIA 官方 compat），
-> 已投产、当前暂停（调工作流以满足「人物形象 + 声音沿续一致」，与 H3 本身无关）。
+> 已成功复现。
 > 方法致谢 [souyou233 (EnkiMa)](https://github.com/souyou233)。见 [docs/08-cuda13-forward-compat](docs/08-cuda13-forward-compat/README.md)。
 
 ## TL;DR
