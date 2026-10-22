@@ -101,3 +101,37 @@ git clone https://github.com/Comfy-Org/ComfyUI  # 切 0.38
 | 编译件 | 有（`sd-cli`/`sd-server`） | **无（纯官方件）** |
 | 单段耗时（8 步 LoRA） | 1049 s/段 | 289.4 s/段（**3.63×**） |
 | 状态 | 生产口径 | 已成功复现 |
+
+---
+
+## 7. 附录：Thor05 独立验证（另一块板，2026-10-21）
+
+在 Thor05（同代 Thor，与 Thor02 独立）上，另两步独立验证同样支持本线方法：
+
+**第一步：兼容性 oracle**（[完整记录](thor05-cuda13-compat-oracle-20261021.md)）——
+隔离加载官方 `cuda-compat-orin-13-2` 后，CUDA 13.2 cubin 与 PTX JIT 两臂真实数值
+计算均通过：`cuDriverGetVersion=13020`、65536 元素逐项等于期望、dmesg 零变化、
+25600 大页全部归还。**无需换 6.8 内核**。
+
+**第二步：真实权重层级基准**（[完整记录](thor05-cuda13-layer-bench-20261021.md)）——
+三模型 INT8 ConvRot 真实权重层，CUDA 12.8 eager → CUDA 13 native：
+
+| 模型 | M | cu12.8 eager | cu13 native | 提速 | NRMSE |
+|---|---:|---:|---:|---:|---:|
+| H3（DiT 层） | 256 | 2.988 ms | 0.454 ms | **6.58×** | 0.441% |
+| H3（DiT 层） | 1024 | 4.373 ms | 1.539 ms | **2.84×** | 0.450% |
+| Music3（完整 36 层 DiT forward） | 256 | 242.667 ms | 57.773 ms | **4.20×** | 3.76% |
+| Music3（完整 36 层 DiT forward） | 512 | 315.542 ms | 98.999 ms | **3.19×** | 4.10% |
+| Qwen-Image 2.1（层） | 256 | 1.353 ms | 0.247 ms | **5.47×** | 0.466% |
+| Qwen-Image 2.1（层） | 1024 | 2.117 ms | 0.840 ms | **2.52×** | 0.462% |
+
+边界：层级/单层 forward 倍数不能外推为端到端倍数；NRMSE 门是数值门不是感知质量
+验收；短基准未锁频未长稳。Thor02 端到端 3.63×（§4）是唯一的端到端口径。
+
+**共用底座核验**：Thor05 验证所用 compat 与 LLM 线共用底座内的
+`libcuda.so.1.1` **sha256 逐字节一致**（`e4c849be…f801d`，NVIDIA 官方 deb 原样件）——
+LLM（thor01）与 H3/Image（thor02/thor05）用的是同一份官方 compat。
+
+与早期 kit（ComfyUI 0.34 快照 + comfy_kitchen 0.2.31 离线 wheel 栈）的部署要点，
+见 [thor05-cuda13-kit-readme-20261021.md](thor05-cuda13-kit-readme-20261021.md)
+（历史口径：层级基准阶段的部署方法；本线现口径为 §3 官方 wheel 复现清单）。
