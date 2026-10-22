@@ -17,6 +17,11 @@
 
 **语言 / Language**：中文（英文版规划中）
 
+> 🚀 **CUDA 13 前向兼容线（2026-10-22）** — MiniMax-H3 的 ComfyUI cu130 路线，8 步生产 LoRA
+> 同口径 **289.4 s/段 vs sd.cpp 1049 s/段 = 3.63×**。无自编译件（纯官方 wheel + NVIDIA 官方 compat），
+> 已投产、当前暂停（调工作流以满足「人物形象 + 声音沿续一致」，与 H3 本身无关）。
+> 方法致谢 [souyou233 (EnkiMa)](https://github.com/souyou233)。见 [docs/08-cuda13-forward-compat](docs/08-cuda13-forward-compat/README.md)。
+
 ## TL;DR
 
 | 项 | 结果 |
@@ -49,6 +54,7 @@
 | [docs/04-resolution-vram/resolution-vram-measured.md](docs/04-resolution-vram/resolution-vram-measured.md) | 分辨率上限与显存腾挪实测：`te=disk` 腾出 15.88 GiB、三档分辨率 × 耗时 × 显存、1344×768 跑通、提示词配方、交付前自检 |
 | **图片线（Z-Image-Turbo，文生图）** | |
 | [docs/07-z-image/z-image-quickstart.md](docs/07-z-image/z-image-quickstart.md) | **图片线下载即用**：三件套权重与校验值、**不需独占池**（可与常驻 LLM 共存）、完整参数速查、批量脚本、多档位实测、排障、调优 |
+| [docs/08-cuda13-forward-compat/README.md](docs/08-cuda13-forward-compat/README.md) | **CUDA 13 前向兼容线（ComfyUI cu130）**：H3 提速 3.63× 的复现清单（官方 wheel + NVIDIA compat deb，无自编译件），含 SHA256 / 版本锁 / 安装顺序 / 实测 / 状态 |
 | **通用（两条线共用）** | |
 | [docs/05-prebuilt-binary/prebuilt-binary-quickstart.md](docs/05-prebuilt-binary/prebuilt-binary-quickstart.md) | 预编译二进制下载即用：平台判断、下载校验、上板 5 步、模型获取与 GGUF 头部比对、常见错误对照、构建来源 |
 | [docs/06-http-api/http-api-deployment.md](docs/06-http-api/http-api-deployment.md) | 把出图部署成 HTTP 服务（给别的程序/Agent 调用）：前置检查 → 上传 → systemd → 自检 → 排障 + 单文件实现 |
