@@ -7,7 +7,9 @@
 
 > **方法来源致谢**：CUDA 13 forward-compat 在 Thor 上的方法来自网友
 > [souyou233 (EnkiMa)](https://github.com/souyou233) 的公开工作
-> [Minimax-H3-on-thor-u](https://github.com/souyou233/Minimax-H3-on-thor-u)。
+> [Minimax-H3-on-thor-u](https://github.com/souyou233/Minimax-H3-on-thor-u)（H3 视频）与
+> [Qwen-Image-on-thor-u](https://github.com/souyou233/Qwen-Image-on-thor-u)（Qwen-Image 2.1 图片，
+> 共用同一 cu130 运行时）。
 > 共用底座（compat + runtime）见 [thor-fp8-llm docs/11](https://github.com/isenlink/thor-fp8-llm/tree/main/docs/11-cuda132-shared-base)。
 
 ---
